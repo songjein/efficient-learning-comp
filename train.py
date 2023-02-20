@@ -98,8 +98,8 @@ def evaluation(
 if __name__ == "__main__":
     wandb.login()  # 5d79916301c00be72f89a04fe67a5272e7a4e541
 
-    epochs = 3
-    batch_size = 512  # TODO: x 4배 로직 추가 or max_seq_len 더 작게
+    epochs = 2
+    batch_size = 256
     valid_batch_size = 32
     learning_rate = 3e-5
     warmup_ratio = 0.05
@@ -108,7 +108,9 @@ if __name__ == "__main__":
     temperature = 0.01
     label_smoothing = 0.1
     seed = 42
-    projection_size = 128
+    projection_size = 256
+    topic_max_seq_len = 256
+    content_max_seq_len = 256
     output_dir = "./outputs"
     valid_steps = 50
 
@@ -126,6 +128,8 @@ if __name__ == "__main__":
             "label_smoothing": label_smoothing,
             "seed": seed,
             "projection_size": projection_size,
+            "topic_max_seq_len": topic_max_seq_len,
+            "content_max_seq_len": content_max_seq_len,
         },
     )
 
@@ -188,8 +192,8 @@ if __name__ == "__main__":
         df_topic,
         df_content,
         tokenizer,
-        topic_max_seq_len=256,
-        content_max_seq_len=128,
+        topic_max_seq_len=topic_max_seq_len,
+        content_max_seq_len=content_max_seq_len,
     )
 
     topic_ids = []
@@ -206,8 +210,8 @@ if __name__ == "__main__":
         df_topic,
         df_content,
         tokenizer,
-        topic_max_seq_len=256,
-        content_max_seq_len=128,
+        topic_max_seq_len=topic_max_seq_len,
+        content_max_seq_len=content_max_seq_len,
     )
 
     random.seed(seed)
@@ -250,6 +254,7 @@ if __name__ == "__main__":
 
     bi_encoder = BiEncoder(topic_encoder, content_encoder).cuda()
 
+    # TODO: layerwise LR decay (but, bi-encoder라 좀 고려할게 있을 수도)
     no_decay = ["bias", "LayerNorm.weight"]
     optimizer_parameters = [
         {
@@ -280,6 +285,7 @@ if __name__ == "__main__":
 
     global_step = 0
 
+    max_score = 0
     for epoch in range(epochs):
         data_loader_tqdm = tqdm(train_dataloader, file=sys.stdout)
         for idx, (topic_input, content_input) in enumerate(data_loader_tqdm):
@@ -324,11 +330,10 @@ if __name__ == "__main__":
 
             global_step += 1
 
-            data_loader_tqdm.set_description(
-                f"Epoch {epoch}, loss: {loss.detach().cpu().item()}"
-            )
+            cur_loss = loss.detach().cpu().item()
+            data_loader_tqdm.set_description(f"Epoch {epoch}, loss: {cur_loss}")
 
-            wandb.log({"train_loss": loss.detach().cpu().item()})
+            wandb.log({"train_loss": cur_loss})
 
             if global_step % valid_steps == 0 or idx == len(train_dataloader) - 1:
                 valid_result = evaluation(
@@ -338,6 +343,15 @@ if __name__ == "__main__":
                 wandb.log({"hits-at-5": valid_result["hits-at-5"]})
                 wandb.log({"hits-at-10": valid_result["hits-at-10"]})
                 wandb.log({"mrr": valid_result["mrr"]})
+
+                cur_score = valid_result["hits-at-10"]
+
+                if cur_score > max_score:
+                    max_score = cur_score
+                    torch.save(
+                        bi_encoder.state_dict(),
+                        f"{output_dir}/model_best_{max_score}.bin",
+                    )
 
         torch.save(
             bi_encoder.state_dict(),
