@@ -112,6 +112,23 @@ if __name__ == "__main__":
     output_dir = "./outputs"
     valid_steps = 50
 
+    wandb.init(
+        project="learning-equality",
+        name="baseline",
+        config={
+            "epochs": epochs,
+            "batch_size": batch_size,
+            "valid_batch_size": valid_batch_size,
+            "warmup_ratio": warmup_ratio,
+            "use_fp16": use_fp16,
+            "grad_ckpt": grad_ckpt,
+            "temperature": temperature,
+            "label_smoothing": label_smoothing,
+            "seed": seed,
+            "projection_size": projection_size,
+        },
+    )
+
     df_topic = pd.read_csv("./topics.csv")
     df_content = pd.read_csv("./content.csv")
     df_correlations = pd.read_csv("./correlations.csv")
@@ -171,7 +188,7 @@ if __name__ == "__main__":
         df_topic,
         df_content,
         tokenizer,
-        topic_max_seq_len=128,
+        topic_max_seq_len=256,
         content_max_seq_len=128,
     )
 
@@ -189,11 +206,9 @@ if __name__ == "__main__":
         df_topic,
         df_content,
         tokenizer,
-        topic_max_seq_len=128,
+        topic_max_seq_len=256,
         content_max_seq_len=128,
     )
-
-    wandb.init(project="learning-equality", name="baseline")
 
     random.seed(seed)
     os.environ["PYTHONHASHSEED"] = str(seed)
