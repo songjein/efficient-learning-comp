@@ -17,11 +17,7 @@ def process_text(text: str) -> str:
 
 
 def traverse_tree(topic_id: str, df_topic: pd.DataFrame, traverse_cache: dict):
-    """build context(tree) from a node to its root recursively
-
-    .. note::
-      traverse 를 하지 않고 싶어도, 트리가 넓게 뻗을 수도 있기 때문에 어쩔 수 없을 듯?
-    """
+    """build context(tree) from a node to its root recursively"""
 
     if topic_id in traverse_cache:
         return traverse_cache[topic_id]
@@ -45,14 +41,7 @@ def build_topic_input(
     traverse_cache: dict,
     max_seq_len: int = 256,
 ) -> Dict[str, Any]:
-    """특정 topic으로 부터 tree를 순회하고, text로만 이루어진 context를 만듦.
-
-    .. note::
-        더 큰 배치를 위해 max_seq_len을 제한하고, 길이 안에 들어오도록 level을 추가하는 방식 고려
-        일단 베이스라인은 leaf 제외하곤 title만 쓰자.
-
-        중요: 리프가 밀리면 안됨. 앞에서 조정이 잘 되는지 체크 해야함
-    """
+    """특정 topic으로 부터 tree를 순회하고, text로만 이루어진 context를 만듦"""
 
     topic_family = traverse_tree(topic_id, df_topic, traverse_cache)
 
@@ -144,7 +133,7 @@ def build_content_input(
     max_seq_len: int = 256,
     text_max_char_len: int = 1024,
 ) -> Dict[str, Any]:
-    """특정 content로 text로만 이루어진 context를 만듦."""
+    """content의 제목/설명/텍스트로 이루어진 context를 만듦"""
 
     target_content = df_content[df_content["id"] == content_id].iloc[0].to_dict()
 
