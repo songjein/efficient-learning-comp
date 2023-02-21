@@ -325,7 +325,7 @@ if __name__ == "__main__":
         ]
         lr *= layerwise_lr_deacy_rate
 
-    optimizer = AdamW(optimizer_parameters)
+    optimizer = AdamW(optimizer_grouped_parameters)
 
     total_steps = len(train_dataloader) * epochs
     warmup_steps = int(total_steps * warmup_ratio)
