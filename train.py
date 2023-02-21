@@ -133,6 +133,7 @@ if __name__ == "__main__":
             "projection_size": projection_size,
             "topic_max_seq_len": topic_max_seq_len,
             "content_max_seq_len": content_max_seq_len,
+            "layerwise_lr_deacy_rate": layerwise_lr_deacy_rate,
         },
     )
 
