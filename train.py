@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
+import wandb
 from sklearn.model_selection import GroupKFold
 from torch.nn.functional import kl_div, log_softmax, nll_loss
 from torch.nn.utils import clip_grad_norm_
@@ -14,7 +15,6 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AdamW, AutoTokenizer, get_cosine_schedule_with_warmup
 
-import wandb
 from dataset import LEDataset
 from model import BiEncoder, Encoder
 
@@ -137,6 +137,15 @@ if __name__ == "__main__":
         },
     )
 
+    random.seed(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
     df_topic = pd.read_csv("./topics.csv")
     df_content = pd.read_csv("./content.csv")
     df_correlations = pd.read_csv("./correlations.csv")
@@ -217,15 +226,6 @@ if __name__ == "__main__":
         topic_max_seq_len=topic_max_seq_len,
         content_max_seq_len=content_max_seq_len,
     )
-
-    random.seed(seed)
-    os.environ["PYTHONHASHSEED"] = str(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
 
     train_dataloader = DataLoader(
         train_dataset,
