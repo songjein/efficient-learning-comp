@@ -42,13 +42,22 @@ class Encoder(nn.Module):
         if use_grad_ckpt:
             self.model.gradient_checkpointing_enable()
 
-        self.projection = nn.Linear(hidden_dim, projection_dim)
+        self.projection_dim = projection_dim
+        if projection_dim > 0:
+            self.projection = nn.Linear(hidden_dim, projection_dim)
+
         self.mean_pooler = MeanPooling()
 
     def forward(self, input_ids, attention_mask):
         #: batch x seq_len x hidden_dim
         x = self.model(input_ids, attention_mask)
-        repres = self.projection(self.mean_pooler(x.last_hidden_state, attention_mask))
+
+        if self.projection_dim > 0:
+            repres = self.projection(
+                self.mean_pooler(x.last_hidden_state, attention_mask)
+            )
+        else:
+            repres = self.mean_pooler(x.last_hidden_state, attention_mask)
 
         repres = nn.functional.normalize(repres, p=2, dim=-1)
 

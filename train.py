@@ -114,6 +114,8 @@ if __name__ == "__main__":
     output_dir = "./outputs"
     valid_steps = 50
 
+    os.makedirs(output_dir, exist_ok=True)
+
     wandb.init(
         project="learning-equality",
         name="baseline",
