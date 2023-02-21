@@ -111,6 +111,7 @@ if __name__ == "__main__":
     projection_size = 512
     topic_max_seq_len = 256
     content_max_seq_len = 256
+    layerwise_lr_deacy_rate = 0.9
     output_dir = "./outputs"
     valid_steps = 50
 
@@ -256,27 +257,74 @@ if __name__ == "__main__":
 
     bi_encoder = BiEncoder(topic_encoder, content_encoder).cuda()
 
-    # TODO: layerwise LR decay (but, bi-encoder라 좀 고려할게 있을 수도)
+    # set lr for head(projection layer)
     no_decay = ["bias", "LayerNorm.weight"]
-    optimizer_parameters = [
+    optimizer_grouped_parameters = [
         {
-            "params": [
-                p
-                for n, p in bi_encoder.named_parameters()
-                if not any(nd in n for nd in no_decay)
-            ],
-            "weight_decay": 0.01,
-        },
-        {
-            "params": [
-                p
-                for n, p in bi_encoder.named_parameters()
-                if any(nd in n for nd in no_decay)
-            ],
+            # projection layer with bias
+            "params": [p for n, p in bi_encoder.named_parameters() if "model" not in n],
             "weight_decay": 0.0,
+            "lr": learning_rate,
         },
     ]
-    optimizer = AdamW(optimizer_parameters, lr=learning_rate)
+
+    # set lr for content encoder layers
+    lr = learning_rate
+    layers = [bi_encoder.topic_encoder.model.embeddings] + list(
+        bi_encoder.topic_encoder.model.encoder.layer
+    )
+    for layer in reversed(layers):
+        optimizer_grouped_parameters += [
+            {
+                "params": [
+                    p
+                    for n, p in layer.named_parameters()
+                    if not any(nd in n for nd in no_decay)
+                ],
+                "weight_decay": 0.01,
+                "lr": lr,
+            },
+            {
+                "params": [
+                    p
+                    for n, p in layer.named_parameters()
+                    if any(nd in n for nd in no_decay)
+                ],
+                "weight_decay": 0.0,
+                "lr": lr,
+            },
+        ]
+        lr *= layerwise_lr_deacy_rate
+
+    # set lr for content encoder layers
+    lr = learning_rate
+    layers = [bi_encoder.content_encoder.model.embeddings] + list(
+        bi_encoder.content_encoder.model.encoder.layer
+    )
+    for layer in reversed(layers):
+        optimizer_grouped_parameters += [
+            {
+                "params": [
+                    p
+                    for n, p in layer.named_parameters()
+                    if not any(nd in n for nd in no_decay)
+                ],
+                "weight_decay": 0.01,
+                "lr": lr,
+            },
+            {
+                "params": [
+                    p
+                    for n, p in layer.named_parameters()
+                    if any(nd in n for nd in no_decay)
+                ],
+                "weight_decay": 0.0,
+                "lr": lr,
+            },
+        ]
+        lr *= layerwise_lr_deacy_rate
+
+    optimizer = AdamW(optimizer_parameters)
 
     total_steps = len(train_dataloader) * epochs
     warmup_steps = int(total_steps * warmup_ratio)
