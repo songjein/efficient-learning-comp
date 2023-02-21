@@ -98,7 +98,7 @@ def evaluation(
 if __name__ == "__main__":
     wandb.login()  # 5d79916301c00be72f89a04fe67a5272e7a4e541
 
-    epochs = 2
+    epochs = 1
     batch_size = 256
     valid_batch_size = 32
     learning_rate = 3e-5
@@ -108,7 +108,7 @@ if __name__ == "__main__":
     temperature = 0.01
     label_smoothing = 0.1
     seed = 42
-    projection_size = 256
+    projection_size = 512
     topic_max_seq_len = 256
     content_max_seq_len = 256
     output_dir = "./outputs"
