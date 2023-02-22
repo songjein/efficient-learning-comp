@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
-import wandb
 from sklearn.model_selection import GroupKFold
 from torch.nn.functional import kl_div, log_softmax, nll_loss
 from torch.nn.utils import clip_grad_norm_
@@ -15,6 +14,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AdamW, AutoTokenizer, get_cosine_schedule_with_warmup
 
+import wandb
 from dataset import LEDataset
 from model import BiEncoder, Encoder
 
@@ -98,10 +98,11 @@ def evaluation(
 if __name__ == "__main__":
     wandb.login()  # 5d79916301c00be72f89a04fe67a5272e7a4e541
 
+    memo = "no-lwlr-3e-5-384b"
     epochs = 1
-    batch_size = 256
+    batch_size = 256 + 128
     valid_batch_size = 32
-    learning_rate = 3e-5
+    learning_rate = 3e-4
     warmup_ratio = 0.05
     use_fp16 = False  # 켜면 학습이 안됌 ㅠㅠ
     grad_ckpt = True
@@ -112,14 +113,14 @@ if __name__ == "__main__":
     topic_max_seq_len = 256
     content_max_seq_len = 256
     layerwise_lr_deacy_rate = 0.9
-    output_dir = "./outputs"
+    output_dir = f"./outputs-{memo}"
     valid_steps = 50
 
     os.makedirs(output_dir, exist_ok=True)
 
     wandb.init(
+        name=memo,
         project="learning-equality",
-        name="baseline",
         config={
             "epochs": epochs,
             "batch_size": batch_size,
@@ -401,7 +402,7 @@ if __name__ == "__main__":
                     max_score = cur_score
                     torch.save(
                         bi_encoder.state_dict(),
-                        f"{output_dir}/model_best_{max_score}.bin",
+                        f"{output_dir}/model_best.bin",
                     )
 
         torch.save(
