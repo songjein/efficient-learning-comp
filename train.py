@@ -98,20 +98,21 @@ def evaluation(
 if __name__ == "__main__":
     wandb.login()  # 5d79916301c00be72f89a04fe67a5272e7a4e541
 
-    memo = "no-lwlr-3e-5-384b"
-    epochs = 1
-    batch_size = 256 + 128
+    memo = "lwlr-3e-4-512b-256t128c-2ep"
+    model_name = "microsoft/mdeberta-v3-base"
+    epochs = 2
+    batch_size = 512
     valid_batch_size = 32
     learning_rate = 3e-4
     warmup_ratio = 0.05
-    use_fp16 = False  # 켜면 학습이 안됌 ㅠㅠ
+    use_fp16 = False
     grad_ckpt = True
     temperature = 0.01
     label_smoothing = 0.1
     seed = 42
     projection_size = 512
     topic_max_seq_len = 256
-    content_max_seq_len = 256
+    content_max_seq_len = 128
     layerwise_lr_deacy_rate = 0.9
     output_dir = f"./outputs-{memo}"
     valid_steps = 50
@@ -190,7 +191,7 @@ if __name__ == "__main__":
     ).reset_index()
     df_topic_corr_valid = df_topic_corr_non_source_valid.reset_index()
 
-    tokenizer = AutoTokenizer.from_pretrained("microsoft/mdeberta-v3-base")
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
 
     topic_ids = []
     content_ids = []
@@ -244,14 +245,14 @@ if __name__ == "__main__":
     )
 
     topic_encoder = Encoder(
-        model_name_or_path="microsoft/mdeberta-v3-base",
+        model_name_or_path=model_name,
         projection_dim=projection_size,
         hidden_dim=768,
         use_grad_ckpt=grad_ckpt,
     )
 
     content_encoder = Encoder(
-        model_name_or_path="microsoft/mdeberta-v3-base",
+        model_name_or_path=model_name,
         projection_dim=projection_size,
         hidden_dim=768,
         use_grad_ckpt=grad_ckpt,
