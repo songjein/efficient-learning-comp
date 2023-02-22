@@ -355,7 +355,6 @@ if __name__ == "__main__":
                     content_ids=content_input_ids,
                     content_attention_mask=content_attention_mask,
                 )
-
                 score = score / temperature
 
                 batch_size = score.size(0)
@@ -366,6 +365,7 @@ if __name__ == "__main__":
                 ).cuda()
                 soft_labels[range(batch_size), range(batch_size)] += target_conf
                 loss = kl_div(score.log_softmax(-1), soft_labels, reduction="batchmean")
+                corrects = torch.eq(score.argmax(-1), soft_labels.argmax(-1)).float()
 
                 # NOTE: 메모리가 더 듦
                 # labels = torch.tensor(list(range(batch_size))).cuda()
@@ -386,6 +386,7 @@ if __name__ == "__main__":
             data_loader_tqdm.set_description(f"Epoch {epoch}, loss: {cur_loss}")
 
             wandb.log({"train_loss": cur_loss})
+            wandb.log({"train_corrects": corrects})
 
             if global_step % valid_steps == 0 or idx == len(train_dataloader) - 1:
                 valid_result = evaluation(
