@@ -8,12 +8,20 @@ from transformers import AutoTokenizer
 
 url_pattern = re.compile(r"https?://\S+")
 space_pattern = re.compile(r"\s+")
+id_pattern = r"\b[0-9a-z]{20,30}\b"  # 5a608819f3a50d049abf68ea
 
 
 def process_text(text: str) -> str:
     text = re.sub(space_pattern, " ", text)
     text = re.sub(url_pattern, "(url)", text)
     return text.replace("()", "").replace("( ", "(").replace(" )", ")").strip()
+
+
+def process_desc(text: str) -> str:
+    text = re.sub(space_pattern, " ", text)
+    text = re.sub(id_pattern, "(id)", text)
+    text = text.replace("source_url=", "").replace("source_id=", "")
+    return text
 
 
 def traverse_tree(topic_id: str, df_topic: pd.DataFrame, traverse_cache: dict):
@@ -49,19 +57,10 @@ def build_topic_input(
     for idx, topic in enumerate(topic_family):
         title = str(topic["title"]).strip()
         description = str(topic["description"]).strip()
+        description = process_desc(description)
         level = topic["level"]
 
         is_leaf = idx == len(topic_family) - 1
-
-        # 5a608819f3a50d049abf68ea 같은 값이 들어가있는 경우 처리
-        # (이후엔 set한다음 추가 조건 걸어도 될 듯? 알파뉴머릭으로만 이루어진 놈들)
-        # zh는 중국어!
-        if (
-            topic["language"] != "zh"
-            and len(description) > 15
-            and " " not in description
-        ):
-            description = "nan"
 
         context_str = f"level {level} topic's"
         if title == "nan":
@@ -139,15 +138,9 @@ def build_content_input(
 
     title = str(target_content["title"]).strip()
     description = str(target_content["description"]).strip()
+    description = process_desc(description)
     text = str(target_content["text"]).strip()
     kind = target_content["kind"]
-
-    if (
-        target_content["language"] != "zh"
-        and len(description) > 15
-        and " " not in description
-    ):
-        description = "nan"
 
     if title == description:
         description = "nan"
