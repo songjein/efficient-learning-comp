@@ -98,7 +98,7 @@ def evaluation(
 if __name__ == "__main__":
     wandb.login()  # 5d79916301c00be72f89a04fe67a5272e7a4e541
 
-    memo = "lwlr-3e-4-512b-256t128c-2ep"
+    memo = ""
     model_name = "microsoft/mdeberta-v3-base"
     epochs = 2
     batch_size = 512
@@ -113,7 +113,8 @@ if __name__ == "__main__":
     projection_size = 512
     topic_max_seq_len = 256
     content_max_seq_len = 128
-    layerwise_lr_deacy_rate = 0.9
+    layerwise_lr_deacy_rate = 1.0
+    memo = f"{batch_size}b-{topic_max_seq_len}t{content_max_seq_len}c-{epochs}e-{memo}"
     output_dir = f"./outputs-{memo}"
     valid_steps = 50
 
@@ -386,8 +387,10 @@ if __name__ == "__main__":
             cur_loss = loss.detach().cpu().item()
             data_loader_tqdm.set_description(f"Epoch {epoch}, loss: {cur_loss}")
 
+            avg_acc = float(corrects.view(-1).mean().item())
+
             wandb.log({"train_loss": cur_loss})
-            wandb.log({"train_corrects": corrects})
+            wandb.log({"train_avg_acc": avg_acc})
 
             if global_step % valid_steps == 0 or idx == len(train_dataloader) - 1:
                 valid_result = evaluation(
