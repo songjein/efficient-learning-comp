@@ -98,25 +98,26 @@ def evaluation(
 if __name__ == "__main__":
     wandb.login()  # 5d79916301c00be72f89a04fe67a5272e7a4e541
 
-    memo = ""
-    model_name = "microsoft/mdeberta-v3-base"
-    epochs = 2
+    memo = "best"
+    model_name = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+    epochs = 5
     batch_size = 512
     valid_batch_size = 32
-    learning_rate = 3e-4
-    warmup_ratio = 0.05
-    use_fp16 = False
+    learning_rate = 2e-5
+    warmup_ratio = 0.1
+    use_fp16 = True
     grad_ckpt = True
-    temperature = 0.01
-    label_smoothing = 0.1
+    temperature = 0.05
+    label_smoothing = 0.0
     seed = 42
-    projection_size = 512
+    projection_size = -1
     topic_max_seq_len = 256
     content_max_seq_len = 128
     layerwise_lr_deacy_rate = 1.0
-    memo = f"{batch_size}b-{topic_max_seq_len}t{content_max_seq_len}c-{epochs}e-{memo}"
+    siamese = False
+    memo = f"{batch_size}b-{topic_max_seq_len}t{content_max_seq_len}c-{epochs}e-{seed}s-{memo}"
     output_dir = f"./outputs-{memo}"
-    valid_steps = 50
+    valid_steps = 10
 
     os.makedirs(output_dir, exist_ok=True)
 
@@ -401,7 +402,7 @@ if __name__ == "__main__":
                 wandb.log({"hits-at-10": valid_result["hits-at-10"]})
                 wandb.log({"mrr": valid_result["mrr"]})
 
-                cur_score = valid_result["hits-at-10"]
+                cur_score = valid_result["hits-at-1"]
 
                 if cur_score > max_score:
                     max_score = cur_score
