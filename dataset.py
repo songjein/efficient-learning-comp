@@ -109,7 +109,8 @@ def build_topic_input(
 
     merged_input_ids = [tokenizer.cls_token_id]
     for idx, input_ids in enumerate(context_input_ids):
-        merged_input_ids += input_ids + [tokenizer.sep_token_id]
+        merged_input_ids += input_ids
+    merged_input_ids += [tokenizer.sep_token_id]
 
     pad_len = max_seq_len - len(merged_input_ids)
     input_ids = merged_input_ids + [tokenizer.pad_token_id] * pad_len
