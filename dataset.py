@@ -1,5 +1,5 @@
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 import pandas as pd
 import torch
@@ -58,22 +58,14 @@ def build_topic_input(
         title = str(topic["title"]).strip()
         description = str(topic["description"]).strip()
         description = process_desc(description)
-        level = topic["level"]
 
-        is_leaf = idx == len(topic_family) - 1
-
-        context_str = f"level {level} topic's"
         if title == "nan":
-            context_str += f" description is `{description}`."
-        elif description == "nan":
-            context_str += f" title is `{title}`."
-        else:
-            if is_leaf:
-                context_str += (
-                    f" title is `{title}` and its description is `{description}`."
-                )
-            else:
-                context_str += f" title is `{title}`."
+            title == "null"
+
+        if description == "nan":
+            description = "null"
+
+        context_str = f"title: {title}. description: {description}."
 
         topic_inputs = tokenizer.encode_plus(
             context_str,
@@ -109,7 +101,10 @@ def build_topic_input(
 
     merged_input_ids = [tokenizer.cls_token_id]
     for idx, input_ids in enumerate(context_input_ids):
-        merged_input_ids += input_ids
+        if idx == len(context_input_ids) - 1:
+            merged_input_ids += [tokenizer.sep_token_id] + input_ids
+        else:
+            merged_input_ids += input_ids
     merged_input_ids += [tokenizer.sep_token_id]
 
     pad_len = max_seq_len - len(merged_input_ids)
@@ -149,22 +144,16 @@ def build_content_input(
     if len(description) <= 1:
         description = "nan"
 
-    input_ids = None
+    if title == "nan":
+        title == "null"
 
-    if title == "nan" and description == "nan":
-        # 둘 다 비어있을 경우엔 text를 사용.
-        # TODO: 텍스트 전처리 고도화
-        content_str = (
-            f"{kind} content's text is `{process_text(text[:text_max_char_len])}`."
-        )
-    else:
-        # 둘 중 하나라도 있을 땐 이들을 활용
-        # TODO: 텍스트가 중요하다면 추후에 빈 공간에 채워 넣기 (왜냐면, title/desc 정보가 너무 없는 경우 손해볼 여지)
-        content_str = f"{kind} content's"
-        if title != "nan":
-            content_str += f" title is `{title}`."
-        if description != "nan":
-            content_str += f" description is `{process_text(description)}`."
+    if description == "nan":
+        description = "null"
+
+    if text == "nan":
+        text = "null"
+
+    content_str = f"type: {kind}. title: {title}. description: {process_text(description)}. text: {process_text(text[:text_max_char_len])}."
 
     topic_inputs = tokenizer.encode_plus(
         content_str,
@@ -184,8 +173,8 @@ def build_content_input(
 
     return {
         "id": target_content["id"],
-        "input_ids": input_ids,
-        "attention_mask": attention_mask,
+        "input_ids": input_ids[:max_seq_len],
+        "attention_mask": attention_mask[:max_seq_len],
         "language": target_content["language"],
     }
 
@@ -240,3 +229,62 @@ class LEDataset(Dataset):
 
     def __len__(self):
         return len(self.topic_ids)
+
+
+class LETripletDataset(Dataset):
+    def __init__(
+        self,
+        triplets: List[Tuple[str, str, str]],
+        df_topic: pd.DataFrame,
+        df_content: pd.DataFrame,
+        tokenizer: AutoTokenizer,
+        topic_max_seq_len=256,
+        content_max_seq_len=128,
+    ):
+        super().__init__()
+        self.triplets = triplets
+        self.df_topic = df_topic
+        self.df_content = df_content
+        self.traverse_cache = dict()
+        self.topic_max_seq_len = topic_max_seq_len
+        self.content_max_seq_len = content_max_seq_len
+        self.tokenizer = tokenizer
+
+    def __getitem__(self, index):
+        topic_id, pos_content_input, neg_content_id = self.triplets[index]
+
+        topic_input = build_topic_input(
+            topic_id,
+            self.df_topic,
+            self.tokenizer,
+            self.traverse_cache,
+            self.topic_max_seq_len,
+        )
+
+        pos_content_input = build_content_input(
+            pos_content_input, self.df_content, self.tokenizer, self.content_max_seq_len
+        )
+
+        neg_content_input = build_content_input(
+            neg_content_id, self.df_content, self.tokenizer, self.content_max_seq_len
+        )
+
+        for k, v in topic_input.items():
+            if k not in ["input_ids", "attention_mask"]:
+                continue
+            topic_input[k] = torch.tensor(v, dtype=torch.long)
+
+        for k, v in pos_content_input.items():
+            if k not in ["input_ids", "attention_mask"]:
+                continue
+            pos_content_input[k] = torch.tensor(v, dtype=torch.long)
+
+        for k, v in neg_content_input.items():
+            if k not in ["input_ids", "attention_mask"]:
+                continue
+            neg_content_input[k] = torch.tensor(v, dtype=torch.long)
+
+        return topic_input, pos_content_input, neg_content_input
+
+    def __len__(self):
+        return len(self.triplets)

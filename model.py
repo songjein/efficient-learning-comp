@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-from torch.utils.checkpoint import checkpoint
 from transformers import AutoConfig, AutoModel
 
 
@@ -32,11 +31,13 @@ class Encoder(nn.Module):
         projection_dim=128,
         hidden_dim=768,
         use_grad_ckpt=False,
+        norm_repres=False,
     ):
         super(Encoder, self).__init__()
 
-        config = AutoConfig.from_pretrained(model_name_or_path)
+        self.norm_repres = norm_repres
 
+        config = AutoConfig.from_pretrained(model_name_or_path)
         self.model = AutoModel.from_pretrained(model_name_or_path, config=config)
 
         if use_grad_ckpt:
@@ -59,7 +60,8 @@ class Encoder(nn.Module):
         else:
             repres = self.mean_pooler(x.last_hidden_state, attention_mask)
 
-        repres = nn.functional.normalize(repres, p=2, dim=-1)
+        if self.norm_repres:
+            repres = nn.functional.normalize(repres, p=2, dim=-1)
 
         return repres
 
@@ -98,3 +100,34 @@ class BiEncoder(nn.Module):
         self, topic_repres: torch.Tensor, content_repres: torch.Tensor
     ) -> torch.Tensor:
         return torch.matmul(topic_repres, content_repres.transpose(0, 1))
+
+
+class BiEncoderTriplet(nn.Module):
+    def __init__(self, topic_encoder: Encoder, content_encoder: Encoder):
+        super().__init__()
+        self.topic_encoder = topic_encoder
+        self.content_encoder = content_encoder
+
+    def forward(
+        self,
+        topic_ids: torch.Tensor,
+        topic_attention_mask: torch.Tensor,
+        pos_content_ids: torch.Tensor,
+        pos_content_attention_mask: torch.Tensor,
+        neg_content_ids: torch.Tensor,
+        neg_content_attention_mask: torch.Tensor,
+    ):
+        topic_repres = self.topic_encoder.forward(
+            input_ids=topic_ids,
+            attention_mask=topic_attention_mask,
+        )
+        pos_content_repres = self.content_encoder.forward(
+            input_ids=pos_content_ids,
+            attention_mask=pos_content_attention_mask,
+        )
+        neg_content_repres = self.content_encoder.forward(
+            input_ids=neg_content_ids,
+            attention_mask=neg_content_attention_mask,
+        )
+
+        return topic_repres, pos_content_repres, neg_content_repres

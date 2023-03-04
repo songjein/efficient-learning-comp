@@ -13,32 +13,26 @@ if __name__ == "__main__":
     content_emb_path = "emb-mini/content_embeddings.pkl"
 
     ids = []
-    topics = []
     for idx, row in tqdm(df_topic.iterrows()):
-        topic = str(row.title) + " " + str(row.description)
-        topics.append(topic)
         ids.append(row.id)
 
     with open(topic_emb_path, "rb") as fIn:
         stored_data = pickle5.load(fIn)
-        topic_embeddings = torch.Tensor(stored_data["embeddings"])
+        _ = torch.Tensor(stored_data["embeddings"])
         topic_ids = stored_data["ids"]
         assert ids[:10] == topic_ids[:10]
 
     ids = []
-    contents = []
     for idx, row in tqdm(df_content.iterrows()):
-        content = str(row.title) + " " + str(row.description)
-        contents.append(content)
         ids.append(row.id)
 
     with open(content_emb_path, "rb") as fIn:
         stored_data = pickle5.load(fIn)
-        content_embeddings = torch.Tensor(stored_data["embeddings"])
+        _ = torch.Tensor(stored_data["embeddings"])
         content_ids = stored_data["ids"]
         assert ids[:10] == content_ids[:10]
 
-    # 임베딩 기반으로 토픽 아이디 positive, negative  할당
+    # 임베딩 기반으로 토픽 아이디와 관련 컨텐츠 아이디 매핑이 담겨 있는 파일
     with open("./emb-base/id2negs.pkl", "rb") as fIn:
         id2negs = pickle5.load(fIn)
 
