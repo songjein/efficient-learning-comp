@@ -156,7 +156,7 @@ if __name__ == "__main__":
         sample = tid2sample[topic_id]
 
         pos_pairs = [(topic_id, pos_id, 1) for pos_id in sample["positives"]]
-        neg_pairs = [(topic_id, pos_id, 0) for pos_id in sample["negatives"][:top_k]]
+        neg_pairs = [(topic_id, neg_id, 0) for neg_id in sample["negatives"][:top_k]]
 
         pairs = pos_pairs + neg_pairs
 
