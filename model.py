@@ -100,34 +100,3 @@ class BiEncoder(nn.Module):
         self, topic_repres: torch.Tensor, content_repres: torch.Tensor
     ) -> torch.Tensor:
         return torch.matmul(topic_repres, content_repres.transpose(0, 1))
-
-
-class BiEncoderTriplet(nn.Module):
-    def __init__(self, topic_encoder: Encoder, content_encoder: Encoder):
-        super().__init__()
-        self.topic_encoder = topic_encoder
-        self.content_encoder = content_encoder
-
-    def forward(
-        self,
-        topic_ids: torch.Tensor,
-        topic_attention_mask: torch.Tensor,
-        pos_content_ids: torch.Tensor,
-        pos_content_attention_mask: torch.Tensor,
-        neg_content_ids: torch.Tensor,
-        neg_content_attention_mask: torch.Tensor,
-    ):
-        topic_repres = self.topic_encoder.forward(
-            input_ids=topic_ids,
-            attention_mask=topic_attention_mask,
-        )
-        pos_content_repres = self.content_encoder.forward(
-            input_ids=pos_content_ids,
-            attention_mask=pos_content_attention_mask,
-        )
-        neg_content_repres = self.content_encoder.forward(
-            input_ids=neg_content_ids,
-            attention_mask=neg_content_attention_mask,
-        )
-
-        return topic_repres, pos_content_repres, neg_content_repres
