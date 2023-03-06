@@ -183,8 +183,12 @@ if __name__ == "__main__":
         with open(os.path.join(preproc_dir, "valid_input_examples.pkl"), "rb") as fIn:
             valid_input_examples = pickle5.load(fIn)
     else:
-        train_input_examples = make_input_examples(train_triplets, tokenizer, n_workers=16)
-        valid_input_examples = make_input_examples(dev_triplets, tokenizer, n_workers=16)
+        train_input_examples = make_input_examples(
+            train_triplets, tokenizer, n_workers=16
+        )
+        valid_input_examples = make_input_examples(
+            dev_triplets, tokenizer, n_workers=16
+        )
         os.makedirs(preproc_dir, exist_ok=True)
         with open(os.path.join(preproc_dir, "train_input_examples.pkl"), "wb") as fOut:
             pickle5.dump(train_input_examples, fOut, protocol=pickle5.HIGHEST_PROTOCOL)
