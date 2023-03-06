@@ -54,7 +54,7 @@ def worker_process(
     return_dict[proc_id] = input_examples
 
 
-def make_input_examples(pairs, n_workers=16):
+def make_input_examples(pairs, tokenizer, n_workers=16):
     chunk_size = len(pairs) // n_workers
     manager = multiprocessing.Manager()
     return_dict = manager.dict()
@@ -94,11 +94,11 @@ def make_input_examples(pairs, n_workers=16):
 if __name__ == "__main__":
     wandb.login()  # 5d79916301c00be72f89a04fe67a5272e7a4e541
 
-    memo = "triplet-loss-top100"
+    memo = "triplet-loss-top50"
     model_name = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
     pos_neg_pairs_path = "./pos_neg_pairs_base/pos_neg_pairs_base.pkl"
     epochs = 10
-    top_k = 100
+    top_k = 50
     batch_size = 256
     warmup_ratio = 0.1
     use_fp16 = True
@@ -107,6 +107,8 @@ if __name__ == "__main__":
     content_max_seq_len = 128
     memo = f"{batch_size}b-{topic_max_seq_len}t{content_max_seq_len}c-{epochs}e-{memo}"
     output_dir = f"./outputs-{memo}"
+    use_preproc_dataset = True
+    preproc_dir = f"./preproc-{memo}"
     valid_steps = 1000
 
     os.makedirs(output_dir, exist_ok=True)
@@ -175,9 +177,19 @@ if __name__ == "__main__":
 
     tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-    train_input_examples = make_input_examples(train_triplets, n_workers=16)
-
-    valid_input_examples = make_input_examples(dev_triplets, n_workers=16)
+    if use_preproc_dataset:
+        with open(os.path.join(preproc_dir, "train_input_examples.pkl"), "rb") as fIn:
+            train_input_examples = pickle5.load(fIn)
+        with open(os.path.join(preproc_dir, "valid_input_examples.pkl"), "rb") as fIn:
+            valid_input_examples = pickle5.load(fIn)
+    else:
+        train_input_examples = make_input_examples(train_triplets, tokenizer, n_workers=16)
+        valid_input_examples = make_input_examples(dev_triplets, tokenizer, n_workers=16)
+        os.makedirs(preproc_dir, exist_ok=True)
+        with open(os.path.join(preproc_dir, "train_input_examples.pkl"), "wb") as fOut:
+            pickle5.dump(train_input_examples, fOut, protocol=pickle5.HIGHEST_PROTOCOL)
+        with open(os.path.join(preproc_dir, "valid_input_examples.pkl"), "wb") as fOut:
+            pickle5.dump(valid_input_examples, fOut, protocol=pickle5.HIGHEST_PROTOCOL)
 
     train_dataloader = DataLoader(
         train_input_examples,
