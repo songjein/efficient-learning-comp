@@ -13,7 +13,7 @@ if __name__ == "__main__":
 
     tok_k = 100
 
-    emb_root = "./emb-base"
+    emb_root = "./emb-ctloss"
     topic_emb_path = f"{emb_root}/topic_embeddings.pkl"
     content_emb_path = f"{emb_root}/content_embeddings.pkl"
 

@@ -9,12 +9,23 @@ import pickle5
 import torch
 from sentence_transformers import SentenceTransformer, util
 from tqdm import tqdm
+from transformers import AutoTokenizer
+
+from dataset import build_content_input, build_topic_input
 
 if __name__ == "__main__":
     df_topic = pd.read_csv("./topics.csv")
     df_content = pd.read_csv("./content.csv")
 
-    # 결과 저장 경로
+    id2topic = dict()
+    for idx, row in tqdm(df_topic.iterrows()):
+        id2topic[row.id] = row.to_dict()
+
+    id2content = dict()
+    for idx, row in tqdm(df_content.iterrows()):
+        id2content[row.id] = row.to_dict()
+
+    # NOTE: 결과 저장 경로
     root_path = "./emb-ctloss"
     os.makedirs(root_path, exist_ok=True)
     topic_emb_path = os.path.join(root_path, "topic_embeddings.pkl")
@@ -22,15 +33,28 @@ if __name__ == "__main__":
     mapping_path = os.path.join(root_path, "id2negs.pkl")
 
     # NOTE: 모델 경로
-    # model_name_or_path = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
-    model_name_or_path = "outputs-256b-128t128c-1e-contrastive-loss/13050"
+    model_name_or_path = "outputs-256b-128t128c-10e-contrastive-loss-top100/"  # best
+    use_trained = True
 
-    model = SentenceTransformer(model_name_or_path, device="cuda")
+    model = SentenceTransformer(model_name_or_path, device="cpu")
+    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
 
+    cache = dict()
     topic_ids = []
     topic_sentences = []
     for idx, row in tqdm(df_topic.iterrows()):
-        topic = str(row.title) + " " + str(row.description)
+        if use_trained:
+            topic = build_topic_input(
+                row.id,
+                id2topic,
+                tokenizer,
+                cache,
+                max_seq_len=128,
+                only_input_text=True,
+                only_use_leaf=False,
+            )
+        else:
+            topic = str(row.title) + " " + str(row.description)
         topic_sentences.append(topic)
         topic_ids.append(row.id)
 
@@ -46,10 +70,20 @@ if __name__ == "__main__":
             protocol=pickle5.HIGHEST_PROTOCOL,
         )
 
+    # TODO: 언어별 그루핑
     content_ids = []
     content_sentences = []
     for idx, row in tqdm(df_content.iterrows()):
-        content = str(row.title) + " " + str(row.description)
+        if use_trained:
+            content = build_content_input(
+                row.id,
+                id2content,
+                tokenizer,
+                max_seq_len=128,
+                only_input_text=True,
+            )
+        else:
+            content = str(row.title) + " " + str(row.description)
         content_sentences.append(content)
         content_ids.append(row.id)
 
@@ -73,7 +107,7 @@ if __name__ == "__main__":
         cos_scores = util.cos_sim(topic_emb, content_embeddings)[
             0
         ]  # torch.Size([1, 154047])
-        top_results = torch.topk(cos_scores, k=100)
+        top_results = torch.topk(cos_scores, k=100)  # TODO: 같은 언어만 고려
         topic_id = topic_ids[idx]
         for score, idx in zip(top_results[0], top_results[1]):
             id2negs[topic_id].append(content_ids[idx])
