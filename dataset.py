@@ -281,7 +281,7 @@ class LEPairwiseDataset(Dataset):
         self.tokenizer = tokenizer
 
     def __getitem__(self, index):
-        topic_id, content_input, label = self.pairs[index]
+        topic_id, content_id, label = self.pairs[index]
 
         topic_str = build_topic_input(
             topic_id,
@@ -294,7 +294,7 @@ class LEPairwiseDataset(Dataset):
         )
 
         content_str = build_content_input(
-            content_input,
+            content_id,
             self.df_content,
             self.tokenizer,
             self.content_max_seq_len,
@@ -305,3 +305,57 @@ class LEPairwiseDataset(Dataset):
 
     def __len__(self):
         return len(self.pairs)
+
+
+class LETripletDataset(Dataset):
+    def __init__(
+        self,
+        triplets: List[Tuple[str, str, int]],
+        df_topic: pd.DataFrame,
+        df_content: pd.DataFrame,
+        tokenizer: AutoTokenizer,
+        topic_max_seq_len=256,
+        content_max_seq_len=128,
+    ):
+        super().__init__()
+        self.triplets = triplets
+        self.df_topic = df_topic
+        self.df_content = df_content
+        self.traverse_cache = dict()
+        self.topic_max_seq_len = topic_max_seq_len
+        self.content_max_seq_len = content_max_seq_len
+        self.tokenizer = tokenizer
+
+    def __getitem__(self, index):
+        topic_id, pos_content_id, neg_content_id = self.triplets[index]
+
+        topic_str = build_topic_input(
+            topic_id,
+            self.df_topic,
+            self.tokenizer,
+            self.traverse_cache,
+            self.topic_max_seq_len,
+            only_input_text=True,
+            only_use_leaf=False,
+        )
+
+        pos_content_str = build_content_input(
+            pos_content_id,
+            self.df_content,
+            self.tokenizer,
+            self.content_max_seq_len,
+            only_input_text=True,
+        )
+
+        neg_content_str = build_content_input(
+            neg_content_id,
+            self.df_content,
+            self.tokenizer,
+            self.content_max_seq_len,
+            only_input_text=True,
+        )
+
+        return topic_str, pos_content_str, neg_content_str
+
+    def __len__(self):
+        return len(self.triplets)
