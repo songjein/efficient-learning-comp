@@ -33,14 +33,15 @@ if __name__ == "__main__":
     mapping_path = os.path.join(root_path, "id2negs.pkl")
 
     # NOTE: 모델 경로
-    model_name_or_path = "outputs-256b-128t128c-10e-contrastive-loss-top100/"  # best
+    model_name_or_path = "outputs-256b-128t128c-10e-contrastive-loss-top100/246470"
     use_trained = True
 
-    model = SentenceTransformer(model_name_or_path, device="cpu")
+    model = SentenceTransformer(model_name_or_path, device="cuda")
     tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
 
     cache = dict()
     topic_ids = []
+    topic_langs = []
     topic_sentences = []
     for idx, row in tqdm(df_topic.iterrows()):
         if use_trained:
@@ -57,6 +58,7 @@ if __name__ == "__main__":
             topic = str(row.title) + " " + str(row.description)
         topic_sentences.append(topic)
         topic_ids.append(row.id)
+        topic_langs.append(row.language)
 
     topic_embeddings = model.encode(topic_sentences, convert_to_tensor=True)
     with open(topic_emb_path, "wb") as fOut:
@@ -99,18 +101,33 @@ if __name__ == "__main__":
             protocol=pickle5.HIGHEST_PROTOCOL,
         )
 
+    #: 언어 별 cid:embedding 매핑
+    lang2id_emb_map = defaultdict(dict)
+
+    for lang in df_content.language.unique():
+        lang2id_emb_map[lang] = {
+            "ids": [],
+            "embeddings": [],
+        }
+
+    for cid, cemb in zip(content_ids, content_embeddings):
+        content = df_content[df_content.id == cid].iloc[0]
+        lang2id_emb_map[content.language]["ids"].append(cid)
+        lang2id_emb_map[content.language]["embeddings"].append(cemb)
+
     # 토픽 id별로 연관 컨텐츠 id 리스트를 top 100 할당.
     id2negs = defaultdict(list)
-    for idx, (topic_sent, topic_emb) in enumerate(
-        tqdm(zip(topic_sentences, topic_embeddings))
+    for idx, (topic_lang, topic_sent, topic_emb) in enumerate(
+        tqdm(zip(topic_langs, topic_sentences, topic_embeddings))
     ):
-        cos_scores = util.cos_sim(topic_emb, content_embeddings)[
-            0
-        ]  # torch.Size([1, 154047])
+        _conent_ids = lang2id_emb_map[topic_lang]["ids"]
+        _content_embs = lang2id_emb_map[topic_lang]["embeddings"]
+        # shape of cos_sim -> torch.Size([1, 154047])
+        cos_scores = util.cos_sim(topic_emb, _content_embs)[0]
         top_results = torch.topk(cos_scores, k=100)  # TODO: 같은 언어만 고려
         topic_id = topic_ids[idx]
         for score, idx in zip(top_results[0], top_results[1]):
-            id2negs[topic_id].append(content_ids[idx])
+            id2negs[topic_id].append(_conent_ids[idx])
 
     with open(mapping_path, "wb") as fOut:
         pickle5.dump(id2negs, fOut, protocol=pickle5.HIGHEST_PROTOCOL)
