@@ -35,6 +35,7 @@ if __name__ == "__main__":
     # NOTE: 모델 경로
     model_name_or_path = "outputs-256b-128t128c-10e-contrastive-loss-top100/246470"
     use_trained = True
+    filter_by_lang = False
 
     model = SentenceTransformer(model_name_or_path, device="cuda")
     tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
@@ -103,26 +104,38 @@ if __name__ == "__main__":
             protocol=pickle5.HIGHEST_PROTOCOL,
         )
 
-    #: 언어 별 cid:embedding 매핑
-    lang2id_emb_map = defaultdict(dict)
+    if filter_by_lang:
+        # 이거 기반으로 필터링해서 후보 뽑았는데, 오히려 성능이 낮아지는 현상? recall 0.813 -> 0.808
+        #: 언어 별 cid:embedding 매핑
+        lang2id_emb_map = defaultdict(dict)
 
-    for lang in df_content.language.unique():
-        lang2id_emb_map[lang] = {
-            "ids": [],
-            "embeddings": [],
-        }
+        for lang in df_content.language.unique():
+            lang2id_emb_map[lang] = {
+                "ids": [],
+                "embeddings": [],
+            }
 
-    for cid, clang, cemb in zip(content_ids, content_langs, content_embeddings):
-        lang2id_emb_map[clang]["ids"].append(cid)
-        lang2id_emb_map[clang]["embeddings"].append(cemb)
+        for cid, clang, cemb in zip(content_ids, content_langs, content_embeddings):
+            lang2id_emb_map[clang]["ids"].append(cid)
+            lang2id_emb_map[clang]["embeddings"].append(cemb)
+
+        for lang in df_content.language.unique():
+            lang2id_emb_map[lang]["embeddings"] = torch.stack(
+                tuple(lang2id_emb_map[lang]["embeddings"])
+            ).cuda()
 
     # 토픽 id별로 연관 컨텐츠 id 리스트를 top 100 할당.
     id2negs = defaultdict(list)
     for idx, (topic_lang, topic_sent, topic_emb) in enumerate(
         tqdm(zip(topic_langs, topic_sentences, topic_embeddings))
     ):
-        _conent_ids = lang2id_emb_map[topic_lang]["ids"]
-        _content_embs = lang2id_emb_map[topic_lang]["embeddings"]
+        if filter_by_lang and (topic_lang in lang2id_emb_map):
+            _conent_ids = lang2id_emb_map[topic_lang]["ids"]
+            _content_embs = lang2id_emb_map[topic_lang]["embeddings"]
+        else:
+            _conent_ids = content_ids
+            _content_embs = content_embeddings
+
         # shape of cos_sim -> torch.Size([1, 154047])
         cos_scores = util.cos_sim(topic_emb, _content_embs)[0]
         top_results = torch.topk(cos_scores, k=100)  # TODO: 같은 언어만 고려
