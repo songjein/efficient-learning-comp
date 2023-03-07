@@ -19,7 +19,7 @@ if __name__ == "__main__":
 
     check_sanity = False
 
-    output_path = "./tmp.pkl"
+    output_path = "./pos_neg_pairs_mpnet/pos_neg_pairs_mpnet.pkl"
 
     if check_sanity:
         ids = []
