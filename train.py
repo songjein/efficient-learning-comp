@@ -19,25 +19,6 @@ from dataset import LEDataset
 from model import BiEncoder, Encoder
 
 
-class MetricManager:
-    def __init__(self):
-        self.losses = []
-        self.corrects = []
-
-    def update(self, loss: torch.Tensor, correct: torch.Tensor):
-        self.losses.append(loss)
-        self.corrects.append(correct)
-
-    def compute(self) -> Tuple[float, float]:
-        # compute average score
-        avg_loss = float(torch.stack(self.losses).mean().item())
-        avg_acc = float(torch.cat(self.corrects).view(-1).mean().item())
-        # clear state
-        self.losses.clear()
-        self.corrects.clear()
-        return avg_loss, avg_acc
-
-
 def evaluation(
     model: nn.Module,
     dataloader: DataLoader,
