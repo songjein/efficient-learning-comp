@@ -7,8 +7,9 @@ import pandas as pd
 import pickle5
 import torch
 import torch.nn.functional as F
-from sentence_transformers import (CrossEncoder, InputExample, cross_encoder,
-                                   losses)
+from sentence_transformers import CrossEncoder, InputExample
+from sentence_transformers.cross_encoder.evaluation import \
+    CEBinaryClassificationEvaluator
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AutoTokenizer
@@ -92,15 +93,17 @@ def make_input_examples(pairs, tokenizer, n_workers=16):
 
 
 if __name__ == "__main__":
+    # torch.multiprocessing.set_start_method("spawn")
+
     wandb.login()  # 5d79916301c00be72f89a04fe67a5272e7a4e541
 
     memo = "crossencoder-top50"
-    model_name = "xlm-roberta-large"
+    model_name = "./10e-ctloss-top100-mpnet"
     # top_k는 학습된 모델이 헷갈려하는 친구들로 구성해야 좋을 듯
     pos_neg_pairs_path = "./pos_neg_pairs_mpnet/pos_neg_pairs_mpnet.pkl"
     epochs = 3
-    top_k = 50
-    batch_size = 256
+    top_k = 10
+    batch_size = 64
     warmup_ratio = 0.1
     use_fp16 = True
     seed = 42
@@ -108,7 +111,7 @@ if __name__ == "__main__":
     content_max_seq_len = 128
     memo = f"{batch_size}b-{topic_max_seq_len}t{content_max_seq_len}c-{epochs}e-{memo}"
     output_dir = f"./outputs-{memo}"
-    use_preproc_dataset = True
+    use_preproc_dataset = False
     preproc_dir = f"./preproc-{memo}"
     valid_steps = 1000
 
@@ -195,24 +198,19 @@ if __name__ == "__main__":
     train_dataloader = DataLoader(
         train_input_examples,
         batch_size=batch_size,
-        num_workers=8,
+        num_workers=0,
         shuffle=True,
     )
 
-    model = CrossEncoder(model_name, num_labels=1)
-
-    cosine_distance_metric = lambda x, y: 1 - F.cosine_similarity(x, y)
-    train_loss = losses.TripletLoss(model=model, distance_metric=cosine_distance_metric)
+    model = CrossEncoder(model_name, num_labels=1, device="cuda")
 
     total_steps = len(train_dataloader) * epochs
     warmup_steps = int(total_steps * warmup_ratio)
 
-    evaluator = (
-        cross_encoder.evaluation.CEBinaryClassificationEvaluator.from_input_examples(
-            valid_input_examples,
-            name="validation",
-            show_progress_bar=True,
-        )
+    evaluator = CEBinaryClassificationEvaluator.from_input_examples(
+        valid_input_examples,
+        name="validation",
+        show_progress_bar=True,
     )
 
     def eval_callback(score, epoch, steps):
@@ -226,9 +224,6 @@ if __name__ == "__main__":
         evaluation_steps=valid_steps,
         callback=eval_callback,
         output_path=output_dir,
-        checkpoint_path=output_dir,
-        checkpoint_save_steps=valid_steps,
-        checkpoint_save_total_limit=3,
         use_amp=use_fp16,
         show_progress_bar=True,
     )
