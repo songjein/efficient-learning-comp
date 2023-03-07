@@ -53,7 +53,7 @@ def worker_process(
     return_dict[proc_id] = input_examples
 
 
-def make_input_examples(pairs, tokenizer,  n_workers=16):
+def make_input_examples(pairs, tokenizer, n_workers=16):
     chunk_size = len(pairs) // n_workers
     manager = multiprocessing.Manager()
     return_dict = manager.dict()
@@ -182,12 +182,8 @@ if __name__ == "__main__":
         with open(os.path.join(preproc_dir, "valid_input_examples.pkl"), "rb") as fIn:
             valid_input_examples = pickle5.load(fIn)
     else:
-        train_input_examples = make_input_examples(
-            train_pairs, tokenizer, n_workers=16
-        )
-        valid_input_examples = make_input_examples(
-            dev_pairs, tokenizer, n_workers=16
-        )
+        train_input_examples = make_input_examples(train_pairs, tokenizer, n_workers=16)
+        valid_input_examples = make_input_examples(dev_pairs, tokenizer, n_workers=16)
         os.makedirs(preproc_dir, exist_ok=True)
         with open(os.path.join(preproc_dir, "train_input_examples.pkl"), "wb") as fOut:
             pickle5.dump(train_input_examples, fOut, protocol=pickle5.HIGHEST_PROTOCOL)
