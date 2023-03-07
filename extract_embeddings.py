@@ -74,6 +74,7 @@ if __name__ == "__main__":
 
     # TODO: 언어별 그루핑
     content_ids = []
+    content_langs = []
     content_sentences = []
     for idx, row in tqdm(df_content.iterrows()):
         if use_trained:
@@ -87,6 +88,7 @@ if __name__ == "__main__":
         else:
             content = str(row.title) + " " + str(row.description)
         content_sentences.append(content)
+        content_langs.append(row.language)
         content_ids.append(row.id)
 
     content_embeddings = model.encode(content_sentences, convert_to_tensor=True)
@@ -110,10 +112,9 @@ if __name__ == "__main__":
             "embeddings": [],
         }
 
-    for cid, cemb in zip(content_ids, content_embeddings):
-        content = df_content[df_content.id == cid].iloc[0]
-        lang2id_emb_map[content.language]["ids"].append(cid)
-        lang2id_emb_map[content.language]["embeddings"].append(cemb)
+    for cid, clang, cemb in zip(content_ids, content_langs, content_embeddings):
+        lang2id_emb_map[clang]["ids"].append(cid)
+        lang2id_emb_map[clang]["embeddings"].append(cemb)
 
     # 토픽 id별로 연관 컨텐츠 id 리스트를 top 100 할당.
     id2negs = defaultdict(list)
