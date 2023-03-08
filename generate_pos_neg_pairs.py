@@ -1,8 +1,8 @@
 """extract_embeddings.py에서 뽑은 topic_id&content_id(top_k) 매핑을 가지고 pos-neg pairs를 만듦"""
 import os
+import pickle
 
 import pandas as pd
-import pickle5
 import torch
 from tqdm import tqdm
 
@@ -27,7 +27,7 @@ if __name__ == "__main__":
             ids.append(row.id)
 
         with open(topic_emb_path, "rb") as fIn:
-            stored_data = pickle5.load(fIn)
+            stored_data = pickle.load(fIn)
             _ = torch.Tensor(stored_data["embeddings"])
             topic_ids = stored_data["ids"]
             assert ids[:10] == topic_ids[:10]
@@ -37,7 +37,7 @@ if __name__ == "__main__":
             ids.append(row.id)
 
         with open(content_emb_path, "rb") as fIn:
-            stored_data = pickle5.load(fIn)
+            stored_data = pickle.load(fIn)
             _ = torch.Tensor(stored_data["embeddings"])
             content_ids = stored_data["ids"]
             assert ids[:10] == content_ids[:10]
@@ -45,7 +45,7 @@ if __name__ == "__main__":
     # extract_embeddings.py에서 추출 된
     # 임베딩 기반으로 토픽 아이디와 관련 컨텐츠 아이디 매핑이 담겨 있는 파일
     with open(os.path.join(emb_root, "id2negs.pkl"), "rb") as fIn:
-        id2negs = pickle5.load(fIn)
+        id2negs = pickle.load(fIn)
 
     id2sample = dict()
     recalls = []
@@ -87,4 +87,4 @@ if __name__ == "__main__":
 
     # 토픽 아이디당 positives, negatives이 담긴 딕셔너리를 파일로 저장
     with open(output_path, "wb") as fOut:
-        pickle5.dump(id2sample, fOut)
+        pickle.dump(id2sample, fOut)

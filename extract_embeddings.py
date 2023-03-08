@@ -2,10 +2,10 @@
 # https://www.sbert.net/examples/applications/computing-embeddings/README.html#input-sequence-length
 # https://www.sbert.net/docs/usage/semantic_textual_similarity.html
 import os
+import pickle
 from collections import defaultdict
 
 import pandas as pd
-import pickle5
 import torch
 from sentence_transformers import SentenceTransformer, util
 from tqdm import tqdm
@@ -26,14 +26,16 @@ if __name__ == "__main__":
         id2content[row.id] = row.to_dict()
 
     # NOTE: 결과 저장 경로
-    root_path = "./emb-ctloss"
+    root_path = "./emb-ctloss-mini"
     os.makedirs(root_path, exist_ok=True)
     topic_emb_path = os.path.join(root_path, "topic_embeddings.pkl")
     content_emb_path = os.path.join(root_path, "content_embeddings.pkl")
     mapping_path = os.path.join(root_path, "id2negs.pkl")
 
     # NOTE: 모델 경로
-    model_name_or_path = "outputs-256b-128t128c-10e-contrastive-loss-top100/246470"
+    model_name_or_path = (
+        "outputs-256b-128t128c-10e-ctloss-top50-based-mpnet-emb/130450/"
+    )
     use_trained = True
     filter_by_lang = False
 
@@ -63,14 +65,14 @@ if __name__ == "__main__":
 
     topic_embeddings = model.encode(topic_sentences, convert_to_tensor=True)
     with open(topic_emb_path, "wb") as fOut:
-        pickle5.dump(
+        pickle.dump(
             {
                 "ids": topic_ids,
                 "sentences": topic_sentences,
-                "embeddings": topic_embeddings,
+                "embeddings": topic_embeddings.detach().cpu(),
             },
             fOut,
-            protocol=pickle5.HIGHEST_PROTOCOL,
+            protocol=pickle.DEFAULT_PROTOCOL,
         )
 
     # TODO: 언어별 그루핑
@@ -94,14 +96,14 @@ if __name__ == "__main__":
 
     content_embeddings = model.encode(content_sentences, convert_to_tensor=True)
     with open(content_emb_path, "wb") as fOut:
-        pickle5.dump(
+        pickle.dump(
             {
                 "ids": content_ids,
                 "sentences": content_sentences,
-                "embeddings": content_embeddings,
+                "embeddings": content_embeddings.detach().cpu(),
             },
             fOut,
-            protocol=pickle5.HIGHEST_PROTOCOL,
+            protocol=pickle.DEFAULT_PROTOCOL,
         )
 
     if filter_by_lang:
@@ -144,4 +146,4 @@ if __name__ == "__main__":
             id2negs[topic_id].append(_conent_ids[idx])
 
     with open(mapping_path, "wb") as fOut:
-        pickle5.dump(id2negs, fOut, protocol=pickle5.HIGHEST_PROTOCOL)
+        pickle.dump(id2negs, fOut, protocol=pickle.HIGHEST_PROTOCOL)
