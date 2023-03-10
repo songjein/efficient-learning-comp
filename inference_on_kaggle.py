@@ -1,3 +1,7 @@
+import sys
+
+sys.path.append("/kaggle/input/sentence-transformers-222/sentence-transformers")
+
 import gc
 import os
 import pickle
@@ -24,11 +28,10 @@ group.add_argument("--cls-thres", type=float, default=0.5)
 group.add_argument("--output-path", type=str, required=True, help="저장 경로 (ex. ./submission_1.csv)")
 group.add_argument("--encoder-path", type=str, required=True, help="인코더 경로 (ex. /kaggle/input/10e-ctloss-top100-mpnet-246470)")
 group.add_argument("--classifier-path", type=str, required=True, help="분류기 경로 (ex. /kaggle/input/cross-encoder-3ep-best-top10)")
-group.add_argument("--embedding-root-path", type=str, required=True, help="추론할 데이터 파일 경로 (ex. /kaggle/input/10e-ctloss-top100-mpnet-emb-cpu-2)")
+group.add_argument("--embedding-root-path", type=str, required=True, help="임베딩 경로 (ex. /kaggle/input/10e-ctloss-top100-mpnet-emb-cpu-2)")
 group.add_argument("--topic-path", type=str, default="/kaggle/input/learning-equality-curriculum-recommendations/topic.csv")
 group.add_argument("--content-path", type=str, default="/kaggle/input/learning-equality-curriculum-recommendations/content.csv")
 group.add_argument("--submit-sample-path", type=str, default="/kaggle/input/learning-equality-curriculum-recommendations/sample_submission.csv")
-group.add_argument("--embedding-root-path", type=str, required=True, help="추론할 데이터 파일 경로 (ex. /kaggle/input/10e-ctloss-top100-mpnet-emb-cpu-2)")
 group.add_argument("--seed", type=int, default=42)
 group.add_argument("--max-seq-len", type=int, default=128)
 group.add_argument("--is-last-model-for-ensemble", action="store_true", help="앙상블의 마지막 모델인지 여부")
