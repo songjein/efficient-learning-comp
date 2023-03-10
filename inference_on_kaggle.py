@@ -299,7 +299,7 @@ if __name__ == "__main__":
             if len(tid2cids[topic_id]) == 0:
                 tid2cids[topic_id].append(candi_content_ids[0])
 
-        del topic_str, candi_content_strs, scores
+        del topic_str, candi_content_strs, scores, inputs
         gc.collect()
 
     result = {
