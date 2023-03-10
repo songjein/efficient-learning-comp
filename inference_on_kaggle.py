@@ -50,16 +50,23 @@ if __name__ == "__main__":
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
+    #: sample for submission
+    sample_submit_df = pd.read_csv(args.submit_sample_path)
+
     # [1] read pre-calculated embeddings
 
     emb_root = args.embedding_root_path
     topic_emb_path = os.path.join(emb_root, "topic_embeddings.pkl")
     content_emb_path = os.path.join(emb_root, "content_embeddings.pkl")
 
+    target_topic_ids = sample_submit_df.topic_id.values
+
     tid2emb = dict()
     with open(topic_emb_path, "rb") as fIn:
         stored_data = pickle.load(fIn)
         for tid, emb in zip(stored_data["ids"], stored_data["embeddings"]):
+            if tid not in target_topic_ids:
+                continue
             tid2emb[tid] = torch.Tensor(emb).cuda()
 
         del stored_data
@@ -110,7 +117,7 @@ if __name__ == "__main__":
     _topic_ids = []
     _topic_strs = []
     for tid in topic_ids:
-        if tid in tid2emb:
+        if tid in tid2emb or tid not in target_topic_ids:
             continue
 
         topic_str = build_topic_input(
@@ -167,31 +174,43 @@ if __name__ == "__main__":
     del _content_ids, _content_strs
     gc.collect()
 
-    #: sample for submission
-    sample_submit_df = pd.read_csv(args.submit_sample_path)
-
     #: sample_submit_df 등장하는 것 만 남기기 (추가로 더 메모리 정리해도 될지는 차후 고민)
     topic_ids = [row.topic_id for idx, row in sample_submit_df.iterrows()]
     topic_embeddings = []
     for tid in topic_ids:
         topic_embeddings.append(tid2emb[tid])
     topic_embeddings = torch.stack(topic_embeddings)
+    del tid2emb
+    gc.collect()
+    torch.cuda.empty_cache()
 
     content_embeddings = []
     for cid in content_ids:
         content_embeddings.append(cid2emb[cid])
     content_embeddings = torch.stack(content_embeddings)
+    del cid2emb
+    gc.collect()
+    torch.cuda.empty_cache()
 
     top_k = args.top_k
 
     topics_preds_gpu = cp.array(topic_embeddings)
+    del topic_embeddings
+    gc.collect()
+
     content_preds_gpu = cp.array(content_embeddings)
+    del content_embeddings
+    gc.collect()
 
     neighbors_model = NearestNeighbors(n_neighbors=top_k, metric="cosine")
     neighbors_model.fit(content_preds_gpu)
 
     # 각 토픽에 대해 knn을 수집
     distances, indices = neighbors_model.kneighbors(topics_preds_gpu)
+
+    del topics_preds_gpu, content_preds_gpu
+    gc.collect()
+    torch.cuda.empty_cache()
 
     # 분류 기준
     cls_thres = args.cls_thres
@@ -283,56 +302,53 @@ if __name__ == "__main__":
         del topic_str, candi_content_strs, scores
         gc.collect()
 
+    result = {
+        "topic_id": [],
+        "content_ids": [],
+    }
+
+    for idx, row in sample_submit_df.iterrows():
+        result["topic_id"].append(row.topic_id)
+        result["content_ids"].append(" ".join(tid2cids[row.topic_id]))
+
+    pd.DataFrame.from_dict(result).to_csv(args.output_path, index=False)
+
+    del encoder, tokenizer
+    del tid2cids
+    del neighbors_model, distances, indices
+    gc.collect()
+    torch.cuda.empty_cache()
+
+    # 마지막 모델이 앙상블을 끝내 놓고 종료
+    if args.is_last_model_for_ensemble:
+        df_sub_1 = pd.read_csv("./submission_1.csv")
+        df_sub_2 = pd.read_csv("./submission_2.csv")
+
         result = {
             "topic_id": [],
             "content_ids": [],
         }
 
-        for idx, row in sample_submit_df.iterrows():
-            result["topic_id"].append(row.topic_id)
-            result["content_ids"].append(" ".join(tid2cids[row.topic_id]))
+        topic_ids = df_sub_1.topic_id.values
+        content_ids_1 = df_sub_1.content_ids.values
+        content_ids_2 = df_sub_2.content_ids.values
 
-        pd.DataFrame.from_dict(result).to_csv(args.output_path, index=False)
+        for idx, (content_ids_a, content_ids_b) in enumerate(
+            zip(content_ids_1, content_ids_2)
+        ):
+            if str(content_ids_a) == "nan":
+                content_ids_a = []
+            else:
+                content_ids_a = content_ids_a.split(" ")
 
-        del encoder
-        del tokenizer
-        del tid2cids
-        del topic_embeddings, topics_preds_gpu, content_embeddings, content_preds_gpu
-        del neighbors_model, distances, indices
-        del cid2emb, tid2emb
-        gc.collect()
-        torch.cuda.empty_cache()
+            if str(content_ids_b) == "nan":
+                content_ids_b = []
+            else:
+                content_ids_b = content_ids_b.split(" ")
 
-        # 마지막 모델이 앙상블을 끝내 놓고 종료
-        if args.is_last_model_for_ensemble:
-            df_sub_1 = pd.read_csv("./submission_1.csv")
-            df_sub_2 = pd.read_csv("./submission_2.csv")
+            merged_items = list(set(content_ids_a).union(set(content_ids_b)))
 
-            result = {
-                "topic_id": [],
-                "content_ids": [],
-            }
+            result["topic_id"].append(topic_ids[idx])
+            result["content_ids"].append(" ".join(merged_items))
 
-            topic_ids = df_sub_1.topic_id.values
-            content_ids_1 = df_sub_1.content_ids.values
-            content_ids_2 = df_sub_2.content_ids.values
-
-            for idx, (content_ids_a, content_ids_b) in enumerate(
-                zip(content_ids_1, content_ids_2)
-            ):
-                if str(content_ids_a) == "nan":
-                    content_ids_a = []
-                else:
-                    content_ids_a = content_ids_a.split(" ")
-
-                if str(content_ids_b) == "nan":
-                    content_ids_b = []
-                else:
-                    content_ids_b = content_ids_b.split(" ")
-
-                merged_items = list(set(content_ids_a).union(set(content_ids_b)))
-
-                result["topic_id"].append(topic_ids[idx])
-                result["content_ids"].append(" ".join(merged_items))
-
-            pd.DataFrame.from_dict(result).to_csv("submission.csv", index=False)
+        pd.DataFrame.from_dict(result).to_csv("submission.csv", index=False)
