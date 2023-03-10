@@ -29,7 +29,7 @@ group.add_argument("--output-path", type=str, required=True, help="저장 경로
 group.add_argument("--encoder-path", type=str, required=True, help="인코더 경로 (ex. /kaggle/input/10e-ctloss-top100-mpnet-246470)")
 group.add_argument("--classifier-path", type=str, required=True, help="분류기 경로 (ex. /kaggle/input/cross-encoder-3ep-best-top10)")
 group.add_argument("--embedding-root-path", type=str, required=True, help="임베딩 경로 (ex. /kaggle/input/10e-ctloss-top100-mpnet-emb-cpu-2)")
-group.add_argument("--topic-path", type=str, default="/kaggle/input/learning-equality-curriculum-recommendations/topic.csv")
+group.add_argument("--topic-path", type=str, default="/kaggle/input/learning-equality-curriculum-recommendations/topics.csv")
 group.add_argument("--content-path", type=str, default="/kaggle/input/learning-equality-curriculum-recommendations/content.csv")
 group.add_argument("--submit-sample-path", type=str, default="/kaggle/input/learning-equality-curriculum-recommendations/sample_submission.csv")
 group.add_argument("--seed", type=int, default=42)
@@ -50,10 +50,9 @@ if __name__ == "__main__":
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-    emb_root = args.embedding_root_path
-
     # [1] read pre-calculated embeddings
 
+    emb_root = args.embedding_root_path
     topic_emb_path = os.path.join(emb_root, "topic_embeddings.pkl")
     content_emb_path = os.path.join(emb_root, "content_embeddings.pkl")
 
@@ -83,8 +82,6 @@ if __name__ == "__main__":
     classifier_apth = args.classifier_path
     classifier = CrossEncoder(classifier_apth, num_labels=1)
 
-    tokenizer = AutoTokenizer.from_pretrained(encoder_path)
-
     # [3] read data & convert to dict
 
     df_topic = pd.read_csv(args.topic_path)
@@ -107,6 +104,8 @@ if __name__ == "__main__":
 
     #: cache for traverse topic tree
     cache = dict()
+
+    tokenizer = AutoTokenizer.from_pretrained(encoder_path)
 
     _topic_ids = []
     _topic_strs = []
@@ -203,6 +202,8 @@ if __name__ == "__main__":
     if args.is_last_model_for_ensemble:
         #: 앙상블 첫 모델의 결과
         df_sub_1 = pd.read_csv("submission_1.csv")
+
+    tokenizer = AutoTokenizer.from_pretrained(encoder_path)
 
     for topic_id, cids, dist in zip(topic_ids, indices, distances):
         #: k-candidates' content_ids
