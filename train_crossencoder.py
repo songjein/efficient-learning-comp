@@ -97,12 +97,12 @@ if __name__ == "__main__":
 
     wandb.login()  # 5d79916301c00be72f89a04fe67a5272e7a4e541
 
-    memo = "crossencoder-top50"
-    model_name = "./10e-ctloss-top100-mpnet"
+    memo = "crossencoder-top50-recall-20"
+    model_name = "outputs-128b-128t128c-10e-ctloss-top100-based-mpnet-remain-recall-20/138610/" # 인코더 웨잇 기반으로 했음. 스크래치? 부터 해보진 않음
     # top_k는 학습된 모델이 헷갈려하는 친구들로 구성해야 좋을 듯
-    pos_neg_pairs_path = "./pos_neg_pairs_mpnet/pos_neg_pairs_mpnet.pkl"
+    pos_neg_pairs_path = "./emb-ctloss-recall-20/pairs/pos_neg_pairs.pkl"
     epochs = 3
-    top_k = 10
+    top_k = 50
     batch_size = 64
     warmup_ratio = 0.1
     use_fp16 = True
@@ -128,6 +128,9 @@ if __name__ == "__main__":
             "seed": seed,
             "topic_max_seq_len": topic_max_seq_len,
             "content_max_seq_len": content_max_seq_len,
+            "pos_neg_pairs_path": pos_neg_pairs_path,
+            "model_path": model_name,
+            "top_k": top_k,
         },
     )
 
