@@ -34,7 +34,7 @@ group.add_argument("--content-path", type=str, default="/kaggle/input/learning-e
 group.add_argument("--submit-sample-path", type=str, default="/kaggle/input/learning-equality-curriculum-recommendations/sample_submission.csv")
 group.add_argument("--seed", type=int, default=42)
 group.add_argument("--max-seq-len", type=int, default=128)
-group.add_argument("--is-last-model-for-ensemble", action="store_true", help="앙상블의 마지막 모델인지 여부")
+group.add_argument("--last-model-for-ensemble", action="store_true", help="앙상블의 마지막 모델인지 여부")
 # fmt: on
 
 if __name__ == "__main__":
@@ -218,7 +218,7 @@ if __name__ == "__main__":
 
     assert len(topic_ids) == len(indices)
 
-    if args.is_last_model_for_ensemble:
+    if args.last_model_for_ensemble:
         #: 앙상블 첫 모델의 결과
         df_sub_1 = pd.read_csv("submission_1.csv")
 
@@ -265,7 +265,7 @@ if __name__ == "__main__":
                 tid2cids[topic_id].append(content_id)
 
         # 앙상블의 마지막 모델이라면 추가 예외 처리
-        if args.is_last_model_for_ensemble:
+        if args.last_model_for_ensemble:
             # 첫 번째 제출의 결과가 비어있을 경우에만 예외 처리
             sub_1_candidates = (
                 df_sub_1[df_sub_1.topic_id == topic_id].iloc[0].content_ids
@@ -320,9 +320,23 @@ if __name__ == "__main__":
     torch.cuda.empty_cache()
 
     # 마지막 모델이 앙상블을 끝내 놓고 종료
-    if args.is_last_model_for_ensemble:
-        df_sub_1 = pd.read_csv("./submission_1.csv")
-        df_sub_2 = pd.read_csv("./submission_2.csv")
+    if args.last_model_for_ensemble:
+        from glob import glob
+
+        submit_files = glob("./submission_*.csv")
+
+        if len(submit_files) == 3:
+            df_sub_1 = pd.read_csv("./submission_1.csv")
+            df_sub_2 = pd.read_csv("./submission_2.csv")
+            df_sub_3 = pd.read_csv("./submission_3.csv")
+        elif len(submit_files) == 2:
+            df_sub_1 = pd.read_csv("./submission_1.csv")
+            df_sub_2 = pd.read_csv("./submission_2.csv")
+            df_sub_3 = None
+        else:
+            df_sub_1 = pd.read_csv("./submission_1.csv")
+            df_sub_2 = None
+            df_sub_3 = None
 
         result = {
             "topic_id": [],
@@ -331,10 +345,19 @@ if __name__ == "__main__":
 
         topic_ids = df_sub_1.topic_id.values
         content_ids_1 = df_sub_1.content_ids.values
-        content_ids_2 = df_sub_2.content_ids.values
 
-        for idx, (content_ids_a, content_ids_b) in enumerate(
-            zip(content_ids_1, content_ids_2)
+        if df_sub_2 is None:
+            content_ids_2 = ["nan"] * len(content_ids_1)
+        else:
+            content_ids_2 = df_sub_2.content_ids.values
+
+        if df_sub_3 is None:
+            content_ids_3 = ["nan"] * len(content_ids_2)
+        else:
+            content_ids_3 = df_sub_3.content_ids.values
+
+        for idx, (content_ids_a, content_ids_b, content_ids_c) in enumerate(
+            zip(content_ids_1, content_ids_2, content_ids_3)
         ):
             if str(content_ids_a) == "nan":
                 content_ids_a = []
@@ -346,7 +369,14 @@ if __name__ == "__main__":
             else:
                 content_ids_b = content_ids_b.split(" ")
 
-            merged_items = list(set(content_ids_a).union(set(content_ids_b)))
+            if str(content_ids_c) == "nan":
+                content_ids_c = []
+            else:
+                content_ids_c = content_ids_c.split(" ")
+
+            merged_items = list(
+                set(content_ids_a).union(set(content_ids_b)).union(set(content_ids_c))
+            )
 
             result["topic_id"].append(topic_ids[idx])
             result["content_ids"].append(" ".join(merged_items))
