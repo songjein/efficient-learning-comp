@@ -35,6 +35,8 @@ group.add_argument("--submit-sample-path", type=str, default="/kaggle/input/lear
 group.add_argument("--seed", type=int, default=42)
 group.add_argument("--max-seq-len", type=int, default=128)
 group.add_argument("--last-model-for-ensemble", action="store_true", help="앙상블의 마지막 모델인지 여부")
+group.add_argument("--use-encoder-topic-parent-desc", action="store_true", help="토픽 트리에서 부모 노드의 description을 활용할지 여부")
+group.add_argument("--use-classifier-topic-parent-desc", action="store_true", help="토픽 트리에서 부모 노드의 description을 활용할지 여부")
 # fmt: on
 
 if __name__ == "__main__":
@@ -127,6 +129,7 @@ if __name__ == "__main__":
             traverse_cache=cache,
             max_seq_len=args.max_seq_len,
             only_input_text=True,
+            use_topic_parent_desc=args.use_encoder_topic_parent_desc,
         )
         _topic_ids.append(tid)
         _topic_strs.append(topic_str)
@@ -237,6 +240,7 @@ if __name__ == "__main__":
             traverse_cache=cache,
             max_seq_len=args.max_seq_len,
             only_input_text=True,
+            use_topic_parent_desc=args.use_classifier_topic_parent_desc,
         )
 
         candi_content_strs = []
