@@ -25,6 +25,7 @@ def worker_process(
     tokenizer,
     topic_max_seq_len,
     content_max_seq_len,
+    use_topic_parent_desc,
 ):
     dataset = LEPairwiseDataset(
         pairs,
@@ -33,6 +34,7 @@ def worker_process(
         tokenizer,
         topic_max_seq_len=topic_max_seq_len,
         content_max_seq_len=content_max_seq_len,
+        use_topic_parent_desc=use_topic_parent_desc,
     )
 
     input_examples = []
@@ -75,6 +77,7 @@ def make_input_examples(pairs, tokenizer, n_workers=16):
                 tokenizer,
                 topic_max_seq_len,
                 content_max_seq_len,
+                use_topic_parent_desc,
             ),
         )
         jobs.append(p)
@@ -93,22 +96,23 @@ def make_input_examples(pairs, tokenizer, n_workers=16):
 if __name__ == "__main__":
     wandb.login()  # 5d79916301c00be72f89a04fe67a5272e7a4e541
 
-    memo = "ctloss-top50-based-mpnet-emb"
-    model_name = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-    pos_neg_pairs_path = "./pos_neg_pairs_mpnet/pos_neg_pairs_mpnet.pkl"
-    epochs = 10
-    top_k = 50
+    memo = "ctloss-top300-based-3-models"
+    model_name = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+    pos_neg_pairs_path = "./pos_neg_pairs_ensemble/pos_neg_pairs_ensemble.pkl"
+    epochs = 15
+    top_k = 100
     batch_size = 256
     warmup_ratio = 0.1
     use_fp16 = True
     seed = 42
     topic_max_seq_len = 128
     content_max_seq_len = 128
-    memo = f"{batch_size}b-{topic_max_seq_len}t{content_max_seq_len}c-{epochs}e-{memo}"
-    use_preproc_dataset = False
+    memo = f"{epochs}e-top{top_k}-{memo}"
+    use_preproc_dataset = True
     output_dir = f"./outputs-{memo}"
     preproc_dir = f"./preproc-{memo}"
     valid_steps = 1000
+    use_topic_parent_desc = True
 
     os.makedirs(output_dir, exist_ok=True)
 
@@ -123,6 +127,10 @@ if __name__ == "__main__":
             "seed": seed,
             "topic_max_seq_len": topic_max_seq_len,
             "content_max_seq_len": content_max_seq_len,
+            "pos_neg_pairs_path": pos_neg_pairs_path,
+            "model_path": model_name,
+            "top_k": top_k,
+            "use_topic_parent_desc": use_topic_parent_desc,
         },
     )
 
@@ -158,6 +166,8 @@ if __name__ == "__main__":
         sample = tid2sample[topic_id]
 
         pos_pairs = [(topic_id, pos_id, 1) for pos_id in sample["positives"]]
+
+        random.shuffle(sample["negatives"])
         neg_pairs = [(topic_id, neg_id, 0) for neg_id in sample["negatives"][:top_k]]
 
         pairs = pos_pairs + neg_pairs
