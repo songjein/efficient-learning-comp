@@ -97,22 +97,22 @@ if __name__ == "__main__":
 
     wandb.login()  # 5d79916301c00be72f89a04fe67a5272e7a4e541
 
-    memo = "crossencoder-top50-recall-20"
-    model_name = "outputs-128b-128t128c-10e-ctloss-top100-based-mpnet-remain-recall-20/138610/" # 인코더 웨잇 기반으로 했음. 스크래치? 부터 해보진 않음
+    _memo = "crossencoder-recall-20"
+    model_name = "microsoft/mdeberta-v3-base"  # 인코더 웨잇 기반으로 했음. 스크래치? 부터 해보진 않음
     # top_k는 학습된 모델이 헷갈려하는 친구들로 구성해야 좋을 듯
-    pos_neg_pairs_path = "./emb-ctloss-recall-20/pairs/pos_neg_pairs.pkl"
+    pos_neg_pairs_path = "./pos_neg_pairs_ensemble/pos_neg_pairs_ensemble.pkl"
     epochs = 3
     top_k = 50
-    batch_size = 64
+    batch_size = 8
     warmup_ratio = 0.1
     use_fp16 = True
     seed = 42
-    topic_max_seq_len = 128
-    content_max_seq_len = 128
-    memo = f"{batch_size}b-{topic_max_seq_len}t{content_max_seq_len}c-{epochs}e-{memo}"
-    output_dir = f"./outputs-{memo}"
+    topic_max_seq_len = 256
+    content_max_seq_len = 256
+    memo = f"{batch_size}b-{topic_max_seq_len}t{content_max_seq_len}c-{epochs}e-top{top_k}-{_memo}"
+    output_dir = f"./outputs-{_memo}"
     use_preproc_dataset = False
-    preproc_dir = f"./preproc-{memo}"
+    preproc_dir = f"./preproc-{_memo}"
     valid_steps = 1000
 
     os.makedirs(output_dir, exist_ok=True)

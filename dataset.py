@@ -52,6 +52,7 @@ def build_topic_input(
     max_seq_len: int = 256,
     only_input_text: bool = False,
     only_use_leaf: bool = False,
+    use_topic_parent_desc: bool = False,
 ) -> Dict[str, Any]:
     """특정 topic으로 부터 tree를 순회하고, text로만 이루어진 context를 만듦"""
 
@@ -78,7 +79,7 @@ def build_topic_input(
         if title == "null" and description == "null":
             continue
 
-        if not is_leaf:
+        if not use_topic_parent_desc and not is_leaf:
             context_str = f"title: {title}."
         else:
             context_str = f"title: {title}. description: {description}."
@@ -270,6 +271,7 @@ class LEPairwiseDataset(Dataset):
         tokenizer: AutoTokenizer,
         topic_max_seq_len=256,
         content_max_seq_len=128,
+        use_topic_parent_desc=False,
     ):
         super().__init__()
         self.pairs = pairs
@@ -279,6 +281,7 @@ class LEPairwiseDataset(Dataset):
         self.topic_max_seq_len = topic_max_seq_len
         self.content_max_seq_len = content_max_seq_len
         self.tokenizer = tokenizer
+        self.use_topic_parent_desc = use_topic_parent_desc
 
     def __getitem__(self, index):
         topic_id, content_id, label = self.pairs[index]
@@ -291,6 +294,7 @@ class LEPairwiseDataset(Dataset):
             self.topic_max_seq_len,
             only_input_text=True,
             only_use_leaf=False,
+            use_topic_parent_desc=self.use_topic_parent_desc,
         )
 
         content_str = build_content_input(
