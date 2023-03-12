@@ -8,6 +8,7 @@ import pickle
 import random
 from argparse import ArgumentParser
 from collections import defaultdict
+from glob import glob
 
 import cupy as cp
 import numpy as np
@@ -25,7 +26,7 @@ parser = ArgumentParser()
 group = parser.add_argument_group(title="inference settings")
 group.add_argument("--top-k", type=int, required=True, help="고려 후보 개수")
 group.add_argument("--cls-thres", type=float, default=0.5)
-group.add_argument("--output-path", type=str, required=True, help="저장 경로 (ex. ./submission_1.csv)")
+group.add_argument("--output-path", type=str, required=True, help="저장 경로 (ex. ./candidates_1.csv)")
 group.add_argument("--encoder-path", type=str, required=True, help="인코더 경로 (ex. /kaggle/input/10e-ctloss-top100-mpnet-246470)")
 group.add_argument("--classifier-path", type=str, required=True, help="분류기 경로 (ex. /kaggle/input/cross-encoder-3ep-best-top10)")
 group.add_argument("--embedding-root-path", type=str, required=True, help="임베딩 경로 (ex. /kaggle/input/10e-ctloss-top100-mpnet-emb-cpu-2)")
@@ -215,80 +216,91 @@ if __name__ == "__main__":
     gc.collect()
     torch.cuda.empty_cache()
 
-    # 분류 기준
-    cls_thres = args.cls_thres
-    tid2cids = defaultdict(list)
-
     assert len(topic_ids) == len(indices)
 
-    if args.last_model_for_ensemble:
-        #: 앙상블 첫 모델의 결과
-        df_sub_1 = pd.read_csv("submission_1.csv")
-
-    tokenizer = AutoTokenizer.from_pretrained(encoder_path)
+    result = {
+        "topic_id": [],
+        "content_ids": [],
+    }
 
     for topic_id, cids, dist in zip(topic_ids, indices, distances):
         #: k-candidates' content_ids
         content_indices = cids.get()
-
         candi_content_ids = [content_ids[index] for index in content_indices]
+        result["topic_id"].append(topic_id)
+        result["content_ids"].append(" ".join(candi_content_ids))
 
-        topic_str = build_topic_input(
-            topic_id=topic_id,
-            id2topic=id2topic,
-            tokenizer=tokenizer,
-            traverse_cache=cache,
-            max_seq_len=args.max_seq_len,
-            only_input_text=True,
-            use_topic_parent_desc=args.use_classifier_topic_parent_desc,
-        )
+    # n-th 리트리버 모델의 추론 결과를 담은 df
+    pd.DataFrame.from_dict(result).to_csv(args.output_path, index=False)
 
-        candi_content_strs = []
-        for content_id in candi_content_ids:
-            content_str = build_content_input(
-                content_id=content_id,
-                id2content=id2content,
+    del encoder
+    del neighbors_model, distances, indices
+    gc.collect()
+    torch.cuda.empty_cache()
+
+    # 마지막 모델이 앙상블을 끝내 놓고 종료
+    if args.last_model_for_ensemble:
+
+
+        topic_ids = None
+        tid2cids = defaultdict(set)
+        for filepath in glob("./candidates_*.csv"):
+            df = pd.read_csv(filepath)
+
+            if topic_ids is None:
+                topic_ids = df.topic_id.values
+
+            for idx, row in df.iterrows():
+                tid2cids[row.topic_id].update(set(row.content_ids))
+
+        cls_thres = args.cls_thres
+        result = {
+            "topic_id": [],
+            "content_ids": [],
+        }
+        tokenizer = AutoTokenizer.from_pretrained(encoder_path)
+
+        for topic_id in topic_ids:
+            candi_content_ids = list(tid2cids[topic_id])
+
+            topic_str = build_topic_input(
+                topic_id=topic_id,
+                id2topic=id2topic,
                 tokenizer=tokenizer,
+                traverse_cache=cache,
                 max_seq_len=args.max_seq_len,
                 only_input_text=True,
+                use_topic_parent_desc=args.use_classifier_topic_parent_desc,
             )
-            candi_content_strs.append(content_str)
 
-        topic_lang = id2topic[topic_id]["language"]
+            candi_content_strs = []
+            for content_id in candi_content_ids:
+                content_str = build_content_input(
+                    content_id=content_id,
+                    id2content=id2content,
+                    tokenizer=tokenizer,
+                    max_seq_len=args.max_seq_len,
+                    only_input_text=True,
+                )
+                candi_content_strs.append(content_str)
 
-        inputs = []
-        for content_str in candi_content_strs:
-            inputs.append((topic_str, content_str))
+            topic_lang = id2topic[topic_id]["language"]
 
-        scores = classifier.predict(inputs, show_progress_bar=False)
+            inputs = []
+            for content_str in candi_content_strs:
+                inputs.append((topic_str, content_str))
 
-        # 임계치 넘는 것만 고르기
-        for content_id, score in zip(candi_content_ids, scores):
-            content_lang = id2content[content_id]["language"]
-            if score > cls_thres and topic_lang == content_lang:
-                tid2cids[topic_id].append(content_id)
+            scores = classifier.predict(inputs, show_progress_bar=False)
 
-        # 앙상블의 마지막 모델이라면 추가 예외 처리
-        if args.last_model_for_ensemble:
-            # 첫 번째 제출의 결과가 비어있을 경우에만 예외 처리
-            sub_1_candidates = (
-                df_sub_1[df_sub_1.topic_id == topic_id].iloc[0].content_ids
-            )
-            if str(sub_1_candidates) == "nan":
-                sub_1_candidates = []
+            answer = []
+            # 임계치 넘는 것만 고르기
+            for content_id, score in zip(candi_content_ids, scores):
+                content_lang = id2content[content_id]["language"]
+                if score > cls_thres and topic_lang == content_lang:
+                    answer.append(content_id)
 
-            if len(sub_1_candidates) > 0:
-                continue
-
-            # 임계치 낮추어 고르기 (적정값은 찾아야 함)
-            if len(tid2cids[topic_id]) == 0:
-                for content_id, score in zip(candi_content_ids, scores):
-                    content_lang = id2content[content_id]["language"]
-                    if score > 0.4 and topic_lang == content_lang:
-                        tid2cids[topic_id].append(content_id)
-
-            # 그래도 없다면 언어 일치하는 것에 한해 하나 고르기(분류 스코어 가장 높은 것)
-            if len(tid2cids[topic_id]) == 0:
+            # 없다면 언어 일치하는 것에 한해 하나 고르기(분류 스코어 가장 높은 것)
+            if len(answer) == 0:
                 max_score = 0
                 max_content_id = None
                 for content_id, score in zip(candi_content_ids, scores):
@@ -297,92 +309,12 @@ if __name__ == "__main__":
                         max_content_id = content_id
                         max_score = score
                 if max_content_id is not None:
-                    tid2cids[topic_id].append(max_content_id)
+                    answer.append(max_content_id)
 
-            # 그래도 없을 경우 맨 앞에 것 하나 고르기
-            if len(tid2cids[topic_id]) == 0:
-                tid2cids[topic_id].append(candi_content_ids[0])
+            del topic_str, candi_content_strs, scores, inputs
+            gc.collect()
 
-        del topic_str, candi_content_strs, scores, inputs
-        gc.collect()
-
-    result = {
-        "topic_id": [],
-        "content_ids": [],
-    }
-
-    for idx, row in sample_submit_df.iterrows():
-        result["topic_id"].append(row.topic_id)
-        result["content_ids"].append(" ".join(tid2cids[row.topic_id]))
-
-    pd.DataFrame.from_dict(result).to_csv(args.output_path, index=False)
-
-    del encoder, tokenizer
-    del tid2cids
-    del neighbors_model, distances, indices
-    gc.collect()
-    torch.cuda.empty_cache()
-
-    # 마지막 모델이 앙상블을 끝내 놓고 종료
-    if args.last_model_for_ensemble:
-        from glob import glob
-
-        submit_files = glob("./submission_*.csv")
-
-        if len(submit_files) == 3:
-            df_sub_1 = pd.read_csv("./submission_1.csv")
-            df_sub_2 = pd.read_csv("./submission_2.csv")
-            df_sub_3 = pd.read_csv("./submission_3.csv")
-        elif len(submit_files) == 2:
-            df_sub_1 = pd.read_csv("./submission_1.csv")
-            df_sub_2 = pd.read_csv("./submission_2.csv")
-            df_sub_3 = None
-        else:
-            df_sub_1 = pd.read_csv("./submission_1.csv")
-            df_sub_2 = None
-            df_sub_3 = None
-
-        result = {
-            "topic_id": [],
-            "content_ids": [],
-        }
-
-        topic_ids = df_sub_1.topic_id.values
-        content_ids_1 = df_sub_1.content_ids.values
-
-        if df_sub_2 is None:
-            content_ids_2 = ["nan"] * len(content_ids_1)
-        else:
-            content_ids_2 = df_sub_2.content_ids.values
-
-        if df_sub_3 is None:
-            content_ids_3 = ["nan"] * len(content_ids_2)
-        else:
-            content_ids_3 = df_sub_3.content_ids.values
-
-        for idx, (content_ids_a, content_ids_b, content_ids_c) in enumerate(
-            zip(content_ids_1, content_ids_2, content_ids_3)
-        ):
-            if str(content_ids_a) == "nan":
-                content_ids_a = []
-            else:
-                content_ids_a = content_ids_a.split(" ")
-
-            if str(content_ids_b) == "nan":
-                content_ids_b = []
-            else:
-                content_ids_b = content_ids_b.split(" ")
-
-            if str(content_ids_c) == "nan":
-                content_ids_c = []
-            else:
-                content_ids_c = content_ids_c.split(" ")
-
-            merged_items = list(
-                set(content_ids_a).union(set(content_ids_b)).union(set(content_ids_c))
-            )
-
-            result["topic_id"].append(topic_ids[idx])
-            result["content_ids"].append(" ".join(merged_items))
+            result["topic_id"].append(topic_id)
+            result["content_ids"].append(" ".join(answer))
 
         pd.DataFrame.from_dict(result).to_csv("submission.csv", index=False)
