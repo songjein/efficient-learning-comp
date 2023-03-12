@@ -240,8 +240,6 @@ if __name__ == "__main__":
 
     # 마지막 모델이 앙상블을 끝내 놓고 종료
     if args.last_model_for_ensemble:
-
-
         topic_ids = None
         tid2cids = defaultdict(set)
         for filepath in glob("./candidates_*.csv"):
@@ -251,7 +249,7 @@ if __name__ == "__main__":
                 topic_ids = df.topic_id.values
 
             for idx, row in df.iterrows():
-                tid2cids[row.topic_id].update(set(row.content_ids))
+                tid2cids[row.topic_id].update(set(row.content_ids.split(" ")))
 
         cls_thres = args.cls_thres
         result = {
