@@ -26,15 +26,16 @@ if __name__ == "__main__":
         id2content[row.id] = row.to_dict()
 
     # NOTE: 결과 저장 경로
-    root_path = "./emb-ctloss-mini"
+    root_path = "./emb-300000"
     os.makedirs(root_path, exist_ok=True)
     topic_emb_path = os.path.join(root_path, "topic_embeddings.pkl")
     content_emb_path = os.path.join(root_path, "content_embeddings.pkl")
     mapping_path = os.path.join(root_path, "id2negs.pkl")
+    use_topic_parent_desc = True
 
     # NOTE: 모델 경로
     model_name_or_path = (
-        "outputs-256b-128t128c-10e-ctloss-top50-based-mpnet-emb/130450/"
+        "outputs-15e-top100-ctloss-top300-based-3-models/300000"
     )
     use_trained = True
     filter_by_lang = False
@@ -56,6 +57,7 @@ if __name__ == "__main__":
                 max_seq_len=128,
                 only_input_text=True,
                 only_use_leaf=False,
+                use_topic_parent_desc=use_topic_parent_desc,
             )
         else:
             topic = str(row.title) + " " + str(row.description)
@@ -146,4 +148,4 @@ if __name__ == "__main__":
             id2negs[topic_id].append(_conent_ids[idx])
 
     with open(mapping_path, "wb") as fOut:
-        pickle.dump(id2negs, fOut, protocol=pickle.HIGHEST_PROTOCOL)
+        pickle.dump(id2negs, fOut, protocol=pickle.DEFAULT_PROTOCOL)
