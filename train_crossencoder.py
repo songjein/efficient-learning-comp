@@ -100,22 +100,23 @@ if __name__ == "__main__":
 
     wandb.login()  # 5d79916301c00be72f89a04fe67a5272e7a4e541
 
-    _memo = "crossencoder-3ensemble-top20"
+    _memo = "crossencoder-252000"
     model_name = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"  # 인코더 웨잇 기반으로 했음. 스크래치? 부터 해보진 않음
     # top_k는 학습된 모델이 헷갈려하는 친구들로 구성해야 좋을 듯
-    pos_neg_pairs_path = "./pos_neg_pairs_ensemble/pos_neg_pairs_ensemble.pkl"
+    pos_neg_pairs_path = "./emb-252000-10ep/pos_neg_pairs_top100.pkl"
+
     epochs = 3
-    top_k = 20
+    top_k = 10
     batch_size = 64
     warmup_ratio = 0.1
     use_fp16 = True
-    seed = 42
+    seed = 84
     topic_max_seq_len = 128
     content_max_seq_len = 128
-    memo = f"{batch_size}b-{topic_max_seq_len}t{content_max_seq_len}c-{epochs}e-top{top_k}-{_memo}"
-    output_dir = f"./outputs-{_memo}"
+    memo = f"{seed}s-{batch_size}b-{epochs}e-top{top_k}-{_memo}"
+    output_dir = f"./outputs-{_memo}-{seed}s"
     use_preproc_dataset = False
-    preproc_dir = f"./preproc-{_memo}"
+    preproc_dir = f"./preproc-{_memo}-{seed}s"
     valid_steps = 1000
     use_topic_parent_desc = True
 
