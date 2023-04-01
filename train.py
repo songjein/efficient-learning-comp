@@ -77,7 +77,7 @@ def evaluation(
 
 
 if __name__ == "__main__":
-    wandb.login()  # 5d79916301c00be72f89a04fe67a5272e7a4e541
+    wandb.login()
 
     memo = "best"
     model_name = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
